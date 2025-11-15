@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Beautifier</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #4fc3f7;
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: 500;
+        }
+        
+        .panels {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .panel {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .panel-header {
+            background: #252526;
+            padding: 10px 15px;
+            border-bottom: 1px solid #3e3e42;
+            font-size: 13px;
+            color: #cccccc;
+        }
+        
+        textarea {
+            background: #1e1e1e;
+            border: 1px solid #3e3e42;
+            color: #d4d4d4;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            padding: 15px;
+            resize: vertical;
+            min-height: 400px;
+            line-height: 1.5;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #4fc3f7;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: #0e639c;
+            color: #ffffff;
+            border: none;
+            padding: 8px 20px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #1177bb;
+        }
+        
+        button:active {
+            background: #0d5a8f;
+        }
+        
+        .error {
+            background: #5a1d1d;
+            border-left: 3px solid #f48771;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            display: none;
+        }
+        
+        .error.show {
+            display: block;
+        }
+        
+        select {
+            background: #3c3c3c;
+            color: #cccccc;
+            border: 1px solid #3e3e42;
+            padding: 8px 12px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        
+        select:focus {
+            outline: none;
+            border-color: #4fc3f7;
+        }
+        
+        @media (max-width: 900px) {
+            .panels {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>JSON Beautifier</h1>
+        
+        <div class="error" id="error"></div>
+        
+        <div class="controls">
+            <button id="formatBtn">Format JSON</button>
+            <button id="minifyBtn">Minify</button>
+            <button id="copyBtn">Copy Output</button>
+            <button id="clearBtn">Clear All</button>
+            <select id="indentSize">
+                <option value="2" selected>2 Spaces</option>
+                <option value="4">4 Spaces</option>
+                <option value="tab">Tabs</option>
+            </select>
+        </div>
+        
+        <div class="panels">
+            <div class="panel">
+                <div class="panel-header">Input JSON</div>
+                <textarea id="input" placeholder="Paste your JSON here..."></textarea>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header">Formatted Output</div>
+                <textarea id="output" readonly></textarea>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const inputEl = document.getElementById('input');
+        const outputEl = document.getElementById('output');
+        const errorEl = document.getElementById('error');
+        const formatBtn = document.getElementById('formatBtn');
+        const minifyBtn = document.getElementById('minifyBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const indentSize = document.getElementById('indentSize');
+        
+        function showError(msg) {
+            errorEl.textContent = msg;
+            errorEl.classList.add('show');
+            setTimeout(() => errorEl.classList.remove('show'), 5000);
+        }
+        
+        function formatJSON() {
+            const input = inputEl.value.trim();
+            if (!input) {
+                showError('Input is empty');
+                return;
+            }
+            
+            try {
+                const parsed = JSON.parse(input);
+                const indent = indentSize.value === 'tab' ? '\t' : ' '.repeat(parseInt(indentSize.value));
+                outputEl.value = formatWithIndent(parsed, indent, 0);
+                errorEl.classList.remove('show');
+            } catch (e) {
+                showError('Invalid JSON: ' + e.message);
+            }
+        }
+        
+        function formatWithIndent(obj, indent, depth) {
+            const currentIndent = indent.repeat(depth);
+            const nextIndent = indent.repeat(depth + 1);
+            
+            if (obj === null) return 'null';
+            if (typeof obj === 'boolean') return obj.toString();
+            if (typeof obj === 'number') return obj.toString();
+            if (typeof obj === 'string') {
+                // Check if string contains JSON and parse it
+                try {
+                    const nested = JSON.parse(obj);
+                    return JSON.stringify(obj.slice(0, 1)) + '\n' + nextIndent + 
+                           formatWithIndent(nested, indent, depth + 1).split('\n').join('\n' + nextIndent) + 
+                           '\n' + currentIndent + JSON.stringify(obj.slice(-1));
+                } catch {
+                    return JSON.stringify(obj);
+                }
+            }
+            
+            if (Array.isArray(obj)) {
+                if (obj.length === 0) return '[]';
+                const items = obj.map(item => nextIndent + formatWithIndent(item, indent, depth + 1));
+                return '[\n' + items.join(',\n') + '\n' + currentIndent + ']';
+            }
+            
+            const keys = Object.keys(obj);
+            if (keys.length === 0) return '{}';
+            
+            const pairs = keys.map(key => {
+                const value = formatWithIndent(obj[key], indent, depth + 1);
+                return nextIndent + JSON.stringify(key) + ': ' + value;
+            });
+            
+            return '{\n' + pairs.join(',\n') + '\n' + currentIndent + '}';
+        }
+        
+        function minifyJSON() {
+            const input = inputEl.value.trim();
+            if (!input) {
+                showError('Input is empty');
+                return;
+            }
+            
+            try {
+                const parsed = JSON.parse(input);
+                outputEl.value = JSON.stringify(parsed);
+                errorEl.classList.remove('show');
+            } catch (e) {
+                showError('Invalid JSON: ' + e.message);
+            }
+        }
+        
+        function copyOutput() {
+            if (!outputEl.value) {
+                showError('Nothing to copy');
+                return;
+            }
+            
+            outputEl.select();
+            document.execCommand('copy');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => copyBtn.textContent = originalText, 2000);
+        }
+        
+        function clearAll() {
+            inputEl.value = '';
+            outputEl.value = '';
+            errorEl.classList.remove('show');
+        }
+        
+        formatBtn.addEventListener('click', formatJSON);
+        minifyBtn.addEventListener('click', minifyJSON);
+        copyBtn.addEventListener('click', copyOutput);
+        clearBtn.addEventListener('click', clearAll);
+        
+        inputEl.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                formatJSON();
+            }
+        });
+    </script>
+</body>
+</html>
